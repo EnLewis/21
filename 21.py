@@ -4,24 +4,81 @@ import random
 
 # Two dictionary of more verbose card suits and ranks for output purposes
 suit_verbose = {"s":"Spades", "c":"Clubs", "h":"Hearts", "d":"Diamonds"}
-rank_verbose = {2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", "T": "10",
-                    "J":"Jack", "Q":"Queen", "K":"King", "A":"King"}
+rank_verbose = {"2":"2", "3":"3", "4":"4", "5":"5", "6":"6", "7":"7", "8":"8", "9":"9", "T": "10",
+                    "J":"Jack", "Q":"Queen", "K":"King", "A":"Ace"}
 class Card:
+
     def __init__(self,rank,suit):
-        
+        self._rank = rank
+        self._suit = suit
+
+    def value(self):
+        value = 0
+        ace = 0
+        rank = ord(self._rank)
+
+        if rank == 65: # Ace
+            value = 1
+            # As of right now aces are only worth one because I need to decide how
+            # to deal with multiple aces in one hand
+
+        elif rank in range(50,57): # Non face card or ten
+            value = int(chr(rank))
+
+        else: # All remaining cards are worth 10
+            value = 10
+
+        return value
+
+    def isAce(self):
+        if self._rank == "A":
+            return True
+        else:
+            return False
+
+    def display(self):
+        return "{} of {}".format(rank_verbose[self._rank], suit_verbose[self._suit])
+
+class Hand:
+
+    def __init__(self):
+        self._hand = []
+
+    def add(self,card):
+        self._hand.append(card)
+
+    def handValue(self):
+        value = 0
+        for card in self._hand:
+            value += card.value()
+
+        return value
+
+    def cards(self):
+        return self._hand
+
+    def displayHand(self):
+        display = list()
+        for card in self._hand:
+            display.append(card.display())
+
+        return display
+
 class Deck:
 
     suit = "schd"
     rank = "23456789TJQKA"
 
     def __init__(self):
-        self._deck = [''.join(card) for card in itertools.product(Deck.suit,Deck.rank)]
+        # self._deck = [''.join(card) for card in itertools.product(Deck.suit,Deck.rank)] # list of versions of cards
+        self._deck = [Card(j,i) for i in self.suit for j in self.rank]
+
 
     def shuffle(self):
         ''' Shuffles the current deck '''
         random.shuffle(self._deck)
 
-    def draw(self,num_todraw):
+    def drawMultiple(self,num_todraw):
         ''' Draws a select number of cards from the current deck and returns them
         as a list
         '''
@@ -33,8 +90,13 @@ class Deck:
 
         return result
 
+    def draw(self):
+        ''' Draw one card from the top of the deck'''
+
+        return self._deck.pop(0)
+
     def isEmpty(self):
-        ''' Checks of the deck is empty '''
+        ''' Checks if the deck is empty '''
 
         if len(self._deck) > 0:
             return False
@@ -47,22 +109,30 @@ class Deck:
          '''
         return len(self._deck)
 
+    def displayDeck(self):
+        display = list()
+        for card in self._deck:
+            display.append(card.display())
+
+        return display
+
 class Player:
 
     def __init__(self,name,wallet):
         self._name = name
         self._wallet = wallet
-        self._hand = []
+        self._hand = Hand()
         self._bet = 0
         self._isBust = False
-
 
     def play(self,deck,choice):
         ''' Exectute the players choice for this hand '''
         # Hit
         if choice == 1:
             if deck.cardsLeft() >= 1:
-                self._hand.append(deck.draw(1))
+                self._hand.add(deck.draw())
+                if self._hand.handValue() > 21:
+                    self._isBust = True
 
         # Stay
         elif choice == 2:
@@ -97,31 +167,7 @@ class Player:
         else:
             return True
 
-    def handValue(self):
-        ace = 0
-        value = 0
-        alt_value = None
-        for card in self._hand:
-            rank = ord(card[1])
-
-            if rank == 65: # Ace
-                ace += 1
-                value += 1
-
-            elif rank in range(50,57): # Non face card or ten
-                value += int(chr(rank))
-
-            else: # All remaining cards are worth 10
-                value += 10
-
-        if ace:
-            alt_value = value + ace*10
-            output = (value,alt_value)
-            return output
-        else:
-            return value
-
-    def Reset(self):
+    def reset(self):
         self._hand = []
         self._bet = 0
         self._isBust = False
@@ -132,7 +178,7 @@ class Player:
 
 
 
-
+# Code for testing classes
 print("Hello and welcome to 21.py! ")
 print("please enter your total purse")
 wallet = int(input())
@@ -140,11 +186,30 @@ wallet = int(input())
 player1 = Player("Daniel N.",wallet)
 
 
-print(player1._wallet)
 deck = Deck()
-print(len(deck._deck))
+print(deck.displayDeck())
 deck.shuffle()
-print(len(deck._deck))
+card = deck.draw()
+print("{} is worth {} points".format(card.display(),card.value() ) )
+
+for i in range(2):
+    new_card = deck.draw()
+    player1._hand.add(new_card)
+
+while(True):
+    new_card = deck.draw()
+    print(new_card.display())
+    print(new_card.isAce())
+    if new_card.isAce():
+        player1._hand.add(new_card)
+        break
+    else:
+        continue
+
+print(player1._hand.displayHand() )
+
+print(player1._hand.handValue() )
+
 
 
 
