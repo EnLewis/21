@@ -1,18 +1,29 @@
-#TODO: Implement handling for two aces in hand at once
+#TODO: -Implement handling for two aces in hand at once,
+#      -Implement being able to play on a hand that you have split
+#      -Move betting to the hand class. Maybe make the keep the class for getBet
+#         but just use it as a vehicle to add bets to hands and adjust wallet
+#         values.
 import itertools
 import random
 
-# Two dictionary of more verbose card suits and ranks for output purposes
+# Two dictionary of more verbose card suits and ranks for readable output purposes
 suit_verbose = {"s":"Spades", "c":"Clubs", "h":"Hearts", "d":"Diamonds"}
 rank_verbose = {"2":"2", "3":"3", "4":"4", "5":"5", "6":"6", "7":"7", "8":"8", "9":"9", "T": "10",
                     "J":"Jack", "Q":"Queen", "K":"King", "A":"Ace"}
+
+
 class Card:
+    ''' Data class that handles all the things you could determine by
+    looking at a physical card in ones hand. '''
 
     def __init__(self,rank,suit):
         self._rank = rank
         self._suit = suit
 
     def value(self):
+        ''' Return the integer value of the card '''
+        #TODO doesn't properly handle aces yet
+
         value = 0
         ace = 0
         rank = ord(self._rank)
@@ -31,12 +42,20 @@ class Card:
         return value
 
     def isAce(self):
+        ''' Returns true if the card is an Ace '''
+        #NOTE This method might not actually be necessary, I thought it might
+        # make code more readable in the end? I don't know; if we never use it
+        # I'll remove it.
+
         if self._rank == "A":
             return True
         else:
             return False
 
     def display(self):
+        ''' Returns a more readable string that describes the card in conventional
+        human terms '''
+
         return "{} of {}".format(rank_verbose[self._rank], suit_verbose[self._suit])
 
 class Hand:
@@ -45,9 +64,13 @@ class Hand:
         self._hand = []
 
     def add(self,card):
+        ''' Place a card in the hand '''
+
         self._hand.append(card)
 
     def handValue(self):
+        ''' Returns the cummulative value of all the cards in the hand '''
+
         value = 0
         for card in self._hand:
             value += card.value()
@@ -55,14 +78,37 @@ class Hand:
         return value
 
     def cards(self):
+        ''' Returns a list of the cards in the hand (returns a list of Card classes) '''
+
         return self._hand
 
+    def canSplit(self):
+        ''' Checks to see if the hand can be split, will only split
+        if the hand contains 2 cards of identical rank '''
+
+        if len(self._hand) != 2:
+            return False
+        else:
+            if self._hand[0]._rank == self._hand[1]._rank:
+                return True
+            else:
+                return False
+
+    def discard(self):
+        ''' Discards all cards in the hand. Currently only useful for testing.
+        May need later '''
+
+        self._hand = []
+
     def displayHand(self):
+        ''' Displays the cards in the hand as a read friendly string '''
+
         display = list()
         for card in self._hand:
             display.append(card.display())
 
         return display
+
 
 class Deck:
 
@@ -126,7 +172,13 @@ class Player:
         self._isBust = False
 
     def play(self,deck,choice):
-        ''' Exectute the players choice for this hand '''
+        ''' Exectute the players choice for this hand
+
+            (1)Hit: Add a card to the current hand
+            (2)Stay: Do nothing
+            (3)DoubleDown: Double the bet on the current hand
+            (4)Split: Create another hand and add the starting bet to it
+        '''
         # Hit
         if choice == 1:
             if deck.cardsLeft() >= 1:
@@ -140,17 +192,19 @@ class Player:
 
         # DoubleDown
         elif choice == 3:
-            self.getBet(0,True)
+            self._hand.getBet(0,True)
 
         # Split
         elif choice == 4:
             # Make two seperate hands out of the cards currently in hand if
             # allowed (i.e cards_in_hand < 3, card[0] == card[1])
+
             pass
 
     def getBet(self, wager, doubleDown = False):
         ''' Place a bet on a hand and remove the amount wagered from the player's
         wallet'''
+        
         if wager <= self._wallet:
             if doubleDown:
                 self._wallet -= self._bet
@@ -168,6 +222,6 @@ class Player:
             return True
 
     def reset(self):
-        self._hand = []
+        self._hand.discard()
         self._bet = 0
         self._isBust = False
