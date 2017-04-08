@@ -26,17 +26,26 @@ for player in players:
     player_bet = int(input())
 
     hand = Hand()
-    new_cards = deck.drawMultiple(2)
-    for new_card in new_cards:
-        hand.add(new_card)
+    #NOTE: TESTcode for forcing an ace
+    while(True):
+        new_card = deck.draw()
+        # print(new_card.display())
+        # print(new_card.isAce())
+        if new_card.isAce():
+            hand.add(new_card)
+            break
+        else:
+            continue
+
+    hand.add(deck.draw())
     player.addHand(hand)
 
     # forcing a splittable hand for testing
     # if first:
     #     while(True):
     #         if deck.cardsLeft()>= 2:
-    #         player.printHandsHeld(0,True)
-    #             if hand.canSplit():
+    #             player.printHandsHeld(0,True)
+    #             if hand.canSplit(player):
     #                 first = 0
     #                 break
     #             else:
@@ -52,6 +61,9 @@ for player in players:
     #             deck.shuffle()
     #             continue
 
+
+
+
     player.getBet(hand,player_bet)
     print("{} placed a bet of {}$ on a hand of ".format(player._name, hand._bet))
     player.printHandsHeld(0)
@@ -61,7 +73,14 @@ def turn(player):
     for hand in player._hands:
         print("Excellent, what would you like to do {} with hand...".format(player._name) )
         print("{} (bet: {}$)".format(hand.displayHand(),hand._bet))
-        print("This hands value is {}".format(hand.handValue()))
+        values = hand.handValue()
+        print(values)
+        # Should be contained within a method, is shit
+        for value in values:
+            if value > 21:
+                values.remove(value)
+        display = max(values)
+        print("The highest hand value is {}".format(display) )
         print("Hit, Stay, Double Down, or Split? (1/2/3/4)")
         player_choice = int(input() )
         while( (player_choice != 2) == (hand._isBust == False) ):
@@ -69,10 +88,20 @@ def turn(player):
             player.play(player_choice,deck,hand )
             print("You chose {} for a hand of...".format(player_choice))
             print("{} (bet: {}$)".format(hand.displayHand(),hand._bet))
-            print("This hands value is {}".format(hand.handValue()))
+            # Should be contained within a method, is shit
 
+            values = hand.handValue()
+            for value in values:
+                if value > 21:
+                    values.remove(value)
+            display = max(values)
+            print(values)
+
+            print("This hands value is {}".format(display) )
             if hand._isBust:
                 print("You went Bust! You lost {}$".format(hand._bet))
+                break
+            if player_choice == 3:
                 break
 
             print("Hit, Stay, Double Down, or Split (1/2/3/4)")

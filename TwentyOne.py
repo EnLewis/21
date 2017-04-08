@@ -1,4 +1,4 @@
-#TODO: -Implement handling for two aces in hand at once,
+#TODO: -Ai stuff
 
 import itertools
 import random
@@ -22,7 +22,6 @@ class Card:
         #TODO doesn't properly handle aces yet
 
         value = 0
-        ace = 0
         rank = ord(self._rank)
 
         if rank == 65: # Ace
@@ -76,23 +75,35 @@ class Hand:
     def handValue(self):
         ''' Returns the cummulative value of all the cards in the hand '''
 
-        value = 0
+        value = [0,0]
+        had_eleven = False
         for card in self._hand:
-            value += card.value()
+            new_value = card.value()
+            if new_value == 1 and not had_eleven:
+                value[0] += new_value
+                value[1] += new_value + 10
 
-        return int(value)
+                had_eleven = True
+            else:
+                for i in range(len(value)):
+                    value[i] += new_value
+        return value
 
     def cards(self):
         ''' Returns a list of the cards in the hand (returns a list of Card classes) '''
 
         return self._hand
 
-    def canSplit(self):
+    def canSplit(self, player):
         ''' Checks to see if the hand can be split, will only split
         if the hand contains 2 cards of identical rank '''
 
         if len(self._hand) != 2:
             return False
+
+        elif player._wallet < self._bet:
+            return False
+
         else:
             if self._hand[0]._rank == self._hand[1]._rank:
                 return True
@@ -197,7 +208,8 @@ class Player:
         if choice == 1:
             if deck.cardsLeft() >= 1:
                 hand.add(deck.draw())
-                if hand.handValue() > 21:
+                (value1, value2) = hand.handValue()
+                if (value1 > 21) and (value2 > 21):
                     hand._isBust = True
 
         # Stay
@@ -208,6 +220,7 @@ class Player:
         elif choice == 3:
             if self.canDouble(hand):
                 self.getBet(hand,0,True)
+                self.play(1,deck,hand)
             else:
                 print("I'm sorry you do not have enough money to double down")
 
@@ -216,7 +229,7 @@ class Player:
             # Make two seperate hands out of the cards currently in hand if
             # allowed (i.e cards_in_hand < 3, card[0] == card[1])
 
-            if hand.canSplit():
+            if hand.canSplit(self):
                 (card1, card2) = hand.cards()
                 hand.discardCard(card2)
 
@@ -250,7 +263,7 @@ class Player:
     def canDouble(self,hand):
         ''' Determines whether a player has enough money to double down '''
 
-        if (self._wallet - (2*hand._bet)) < 0:
+        if (self._wallet - (hand._bet)) <= 0:
             return False
         else:
             return True
