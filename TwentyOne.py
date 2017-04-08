@@ -1,4 +1,6 @@
 #TODO: -Implement handling for two aces in hand at once,
+        # Test to push
+        
 import itertools
 import random
 
