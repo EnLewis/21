@@ -1,8 +1,4 @@
 #TODO: -Implement handling for two aces in hand at once,
-#      -Implement being able to play on a hand that you have split
-#      -Move betting to the hand class. Maybe make the keep the class for getBet
-#         but just use it as a vehicle to add bets to hands and adjust wallet
-#         values.
 import itertools
 import random
 
@@ -62,11 +58,19 @@ class Hand:
 
     def __init__(self):
         self._hand = []
+        self._bet = 0
+        self._isBust = False
 
     def add(self,card):
         ''' Place a card in the hand '''
 
         self._hand.append(card)
+
+    def placeBet(self, wager):
+        ''' Place a bet on the hand '''
+
+        self._bet += wager
+
 
     def handValue(self):
         ''' Returns the cummulative value of all the cards in the hand '''
@@ -75,7 +79,7 @@ class Hand:
         for card in self._hand:
             value += card.value()
 
-        return value
+        return int(value)
 
     def cards(self):
         ''' Returns a list of the cards in the hand (returns a list of Card classes) '''
@@ -94,11 +98,16 @@ class Hand:
             else:
                 return False
 
-    def discard(self):
+    def discardHand(self):
         ''' Discards all cards in the hand. Currently only useful for testing.
         May need later '''
 
-        self._hand = []
+        del self._hand[:]
+
+    def discardCard(self,card):
+        ''' Method for discarding a single specific card from the hand. '''
+
+        self._hand.remove(card)
 
     def displayHand(self):
         ''' Displays the cards in the hand as a read friendly string '''
@@ -108,7 +117,6 @@ class Hand:
             display.append(card.display())
 
         return display
-
 
 class Deck:
 
@@ -162,16 +170,21 @@ class Deck:
 
         return display
 
+    def reset(self):
+        self._deck = [Card(j,i) for i in self.suit for j in self.rank]
+
+
 class Player:
 
     def __init__(self,name,wallet):
         self._name = name
         self._wallet = wallet
-        self._hand = Hand()
-        self._bet = 0
-        self._isBust = False
+        self._hands = list()
 
-    def play(self,deck,choice):
+    def addHand(self,hand):
+        self._hands.append(hand)
+
+    def play(self,choice,deck,hand):
         ''' Exectute the players choice for this hand
 
             (1)Hit: Add a card to the current hand
@@ -182,9 +195,9 @@ class Player:
         # Hit
         if choice == 1:
             if deck.cardsLeft() >= 1:
-                self._hand.add(deck.draw())
-                if self._hand.handValue() > 21:
-                    self._isBust = True
+                hand.add(deck.draw())
+                if hand.handValue() > 21:
+                    hand._isBust = True
 
         # Stay
         elif choice == 2:
@@ -192,36 +205,68 @@ class Player:
 
         # DoubleDown
         elif choice == 3:
-            self._hand.getBet(0,True)
+            if self.canDouble(hand):
+                self.getBet(hand,0,True)
+            else:
+                print("I'm sorry you do not have enough money to double down")
 
         # Split
         elif choice == 4:
             # Make two seperate hands out of the cards currently in hand if
             # allowed (i.e cards_in_hand < 3, card[0] == card[1])
 
-            pass
+            if hand.canSplit():
+                (card1, card2) = hand.cards()
+                hand.discardCard(card2)
 
-    def getBet(self, wager, doubleDown = False):
+                new_hand = Hand()
+                new_hand.add(card2)
+                new_hand.add(deck.draw())
+                self.getBet(new_hand,hand._bet)
+                self.addHand(new_hand)
+
+                hand.add(deck.draw())
+
+            else:
+                print("Sorry you cannot split on this hand.")
+
+    def getBet(self,hand, wager, doubleDown = False):
         ''' Place a bet on a hand and remove the amount wagered from the player's
-        wallet'''
-        
+        wallet '''
+
         if wager <= self._wallet:
             if doubleDown:
-                self._wallet -= self._bet
-                self._bet += self._bet
+                self._wallet -= hand._bet
+                hand.placeBet(hand._bet)
             else:
                 self._wallet -= wager
-                self._bet += wager
+                hand.placeBet(wager)
+        else:
+            # To make it easier for the counting AI it may be better to make the
+            # above is return TRUE and this one Return FALSE.
+            print("I'm sorry you do not have enough money to place that bet")
 
-    def canDouble(self):
+    def canDouble(self,hand):
         ''' Determines whether a player has enough money to double down '''
 
-        if (self._wallet - (2*self._bet)) < 0:
+        if (self._wallet - (2*hand._bet)) < 0:
             return False
         else:
             return True
 
+    def printHandsHeld(self,index,full = False):
+        ''' Display all or one of the hands the player is currently holding '''
+
+        if full:
+            for hand in self._hands:
+                print(hand.displayHand())
+
+        else:
+            print(self._hands[index].displayHand())
+
+
     def reset(self):
-        self._hand.discard()
-        self._bet = 0
-        self._isBust = False
+        for hand in self._hands:
+            hand.discardHand()
+            hand._isBust = False
+        del self._hands[:]

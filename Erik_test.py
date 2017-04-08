@@ -1,33 +1,116 @@
 from TwentyOne import *
 
 # Code for testing classes
-print("Hello and welcome to 21.py! ")
-print("please enter your total purse")
-wallet = int(input())
+print("            Hello and welcome to 21.py! ")
+print("How many players are with us tonight? (max. 4)")
+num_players = int(input())
+players = list()
 
-player1 = Player("Daniel N.",wallet)
+if num_players <= 4:
+    for i in range(num_players):
+        print("player{}'s name?'".format(i))
+        name = str(input())
+        print("please give your entire bank balance {}".format(name) )
+        wallet = int(input())
 
+        player = Player(name, wallet)
+        players.append(player)
 
 deck = Deck()
-print(deck.displayDeck())
 deck.shuffle()
-card = deck.draw()
-print("{} is worth {} points".format(card.display(),card.value() ) )
+first = 1
 
-for i in range(2):
-    new_card = deck.draw()
-    player1._hand.add(new_card)
+print("Thank you for joining us, please place a bet before you are dealt in.")
+for player in players:
+    print("{}:".format(player._name))
+    player_bet = int(input())
 
-while(True):
-    new_card = deck.draw()
-    print(new_card.display())
-    print(new_card.isAce())
-    if new_card.isAce():
-        player1._hand.add(new_card)
-        break
-    else:
-        continue
+    hand = Hand()
+    new_cards = deck.drawMultiple(2)
+    for new_card in new_cards:
+        hand.add(new_card)
+    player.addHand(hand)
 
-print(player1._hand.displayHand() )
+    # forcing a splittable hand for testing
+    # if first:
+    #     while(True):
+    #         if deck.cardsLeft()>= 2:
+    #         player.printHandsHeld(0,True)
+    #             if hand.canSplit():
+    #                 first = 0
+    #                 break
+    #             else:
+    #                 player.reset()
+    #                 for i in range(2):
+    #                     new_card = deck.draw()
+    #                     hand.add(new_card)
+    #                 player.addHand(hand)
+    #         else:
+    #             print("Drew whole deck,try again")
+    #             player.reset()
+    #             deck.reset()
+    #             deck.shuffle()
+    #             continue
 
-print(player1._hand.handValue() )
+    player.getBet(hand,player_bet)
+    print("{} placed a bet of {}$ on a hand of ".format(player._name, hand._bet))
+    player.printHandsHeld(0)
+
+
+def turn(player):
+    for hand in player._hands:
+        print("Excellent, what would you like to do {} with hand...".format(player._name) )
+        print("{} (bet: {}$)".format(hand.displayHand(),hand._bet))
+        print("This hands value is {}".format(hand.handValue()))
+        print("Hit, Stay, Double Down, or Split? (1/2/3/4)")
+        player_choice = int(input() )
+        while( (player_choice != 2) == (hand._isBust == False) ):
+
+            player.play(player_choice,deck,hand )
+            print("You chose {} for a hand of...".format(player_choice))
+            print("{} (bet: {}$)".format(hand.displayHand(),hand._bet))
+            print("This hands value is {}".format(hand.handValue()))
+
+            if hand._isBust:
+                print("You went Bust! You lost {}$".format(hand._bet))
+                break
+
+            print("Hit, Stay, Double Down, or Split (1/2/3/4)")
+            player_choice = int(input() )
+
+
+    print("{}'s wallet is {}".format(player._name,player._wallet))
+
+
+for player in players:
+    print("")
+    print("Its {}'s turn!".format(player._name))
+    turn(player)
+
+
+#NOTE: TESTcode for forcing a splitable hand
+# while(first):
+#     if deck.cardsLeft()>= 2:
+#         if hand.canSplit():
+#             print( "{} is holding {}.".format(player1._name,hand1.displayHand()) )
+#             break
+#
+#         player1.reset()
+#         for i in range(2):
+#             new_card = deck.draw()
+#             hand1.add(new_card)
+#     else:
+#         print("Drew whole deck,trying again")
+#         deck = Deck()
+#         player1.reset()
+
+#NOTE: TESTcode for forcing an ace
+# while(True):
+#     new_card = deck.draw()
+#     print(new_card.display())
+#     print(new_card.isAce())
+#     if new_card.isAce():
+#         player1_hand1.add(new_card)
+#         break
+#     else:
+#         continue
