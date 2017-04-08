@@ -283,6 +283,7 @@ class Player:
 
 
     def reset(self):
+        # Do not touch, it is magic and necessary and I don't know why
         for hand in self._hands:
             hand.discardHand()
             hand._isBust = False
