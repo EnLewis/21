@@ -135,9 +135,12 @@ class Deck:
     suit = "schd"
     rank = "23456789TJQKA"
 
-    def __init__(self):
-        # self._deck = [''.join(card) for card in itertools.product(Deck.suit,Deck.rank)] # list of versions of cards
-        self._deck = [Card(j,i) for i in self.suit for j in self.rank]
+    def __init__(self,num_decks):
+        self._deck = list()
+        self._numDecks = num_decks
+        while(num_decks):
+            self._deck += [Card(j,i) for i in self.suit for j in self.rank]
+            num_decks -= 1
 
 
     def shuffle(self):
