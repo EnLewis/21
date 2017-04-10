@@ -17,6 +17,12 @@ class Card:
         self._rank = rank
         self._suit = suit
 
+    def rank(self):
+        return self._rank
+
+    def suit(self):
+        return self._suit
+
     def value(self):
         ''' Return the integer value of the card '''
         #TODO doesn't properly handle aces yet
@@ -26,8 +32,6 @@ class Card:
 
         if rank == 65: # Ace
             value = 1
-            # As of right now aces are only worth one because I need to decide how
-            # to deal with multiple aces in one hand
 
         elif rank in range(50,57): # Non face card or ten
             value = int(chr(rank))
@@ -61,6 +65,15 @@ class Hand:
         self._bet = 0
         self._isBust = False
 
+    def bet(self):
+        return self._bet
+
+    def isBust(self):
+        return self._isBust
+
+    def setBust(self,is_bust):
+        self._isBust = is_bust
+
     def add(self,card):
         ''' Place a card in the hand '''
 
@@ -72,22 +85,31 @@ class Hand:
         self._bet += wager
 
 
-    def handValue(self):
+    def handValue(self, for_ai=False):
         ''' Returns the cummulative value of all the cards in the hand '''
-
-        value = [0,0]
+        values = [0,0]
         had_eleven = False
         for card in self._hand:
             new_value = card.value()
             if new_value == 1 and not had_eleven:
-                value[0] += new_value
-                value[1] += new_value + 10
+                values[0] += new_value
+                values[1] += new_value + 10
 
                 had_eleven = True
             else:
-                for i in range(len(value)):
-                    value[i] += new_value
-        return value
+                for i in range(len(values)):
+                    values[i] += new_value
+        if for_ai:
+            return values
+        else:
+            values_to_keep = []
+            for v in values:
+                if v <= 21:
+                    values_to_keep.append(v)
+
+            if not values_to_keep:
+                return None
+            return max(values_to_keep)
 
     def cards(self):
         ''' Returns a list of the cards in the hand (returns a list of Card classes) '''
@@ -105,7 +127,7 @@ class Hand:
             return False
 
         else:
-            if self._hand[0]._rank == self._hand[1]._rank:
+            if self._hand[0].value() == self._hand[1].value():
                 return True
             else:
                 return False
@@ -142,6 +164,13 @@ class Deck:
             self._deck += [Card(j,i) for i in self.suit for j in self.rank]
             num_decks -= 1
 
+    def trueCountHiLo(self,count):
+        '''
+            Outputs the number of betting units based off count
+            according
+        '''
+        true_count = count//(self.cardsLeft()/54)
+        return max(0, true_count-1)
 
     def shuffle(self):
         ''' Shuffles the current deck '''
@@ -191,13 +220,35 @@ class Deck:
 
 class Player:
 
-    def __init__(self,name,wallet):
+    def __init__(self,name,wallet,ai=False, betting_unit=10):
         self._name = name
         self._wallet = wallet
         self._hands = list()
+        self._ai = ai
+        self._betting_unit = betting_unit
+
+    def hands(self):
+        return self._hands
+
+    def wallet(self):
+        return self._wallet
+
+    def name(self):
+        return self._name
+
+    def isAi(self):
+        return self._ai
 
     def addHand(self,hand):
         self._hands.append(hand)
+
+    def delHand(self,hand):
+        hand.discardHand()
+        hand._isBust = False
+        self._hands.remove(hand)
+
+    def addWallet(self, gain):
+        self._wallet += gain
 
     def play(self,choice,deck,hand):
         ''' Exectute the players choice for this hand
@@ -210,10 +261,13 @@ class Player:
         # Hit
         if choice == 1:
             if deck.cardsLeft() >= 1:
-                hand.add(deck.draw())
-                (value1, value2) = hand.handValue()
-                if (value1 > 21) and (value2 > 21):
-                    hand._isBust = True
+                card = deck.draw()
+                hand.add(card)
+                value = hand.handValue()
+                if value is None:
+                    hand.setBust(True)
+            # for counting purposes need return card
+            return card
 
         # Stay
         elif choice == 2:
@@ -223,9 +277,9 @@ class Player:
         elif choice == 3:
             if self.canDouble(hand):
                 self.getBet(hand,0,True)
-                self.play(1,deck,hand)
+                return self.play(1,deck,hand)
             else:
-                print("I'm sorry you do not have enough money to double down")
+                input("I'm sorry you do not have enough money to double down")
 
         # Split
         elif choice == 4:
@@ -238,14 +292,20 @@ class Player:
 
                 new_hand = Hand()
                 new_hand.add(card2)
-                new_hand.add(deck.draw())
+                new_card1 = deck.draw()
+                new_hand.add(new_card1)
                 self.getBet(new_hand,hand._bet)
                 self.addHand(new_hand)
 
-                hand.add(deck.draw())
+                new_card2 = deck.draw()
+                hand.add(new_card2)
+                return (new_card1, new_card2)
 
-            else:
-                print("Sorry you cannot split on this hand.")
+        # Surrender
+        elif choice == 5:
+            self._wallet += hand.bet()//2
+            hand.setBust(True)
+
 
     def getBet(self,hand, wager, doubleDown = False):
         ''' Place a bet on a hand and remove the amount wagered from the player's
@@ -258,15 +318,16 @@ class Player:
             else:
                 self._wallet -= wager
                 hand.placeBet(wager)
+            return True
         else:
             # To make it easier for the counting AI it may be better to make the
             # above is return TRUE and this one Return FALSE.
-            print("I'm sorry you do not have enough money to place that bet")
+            return False
 
     def canDouble(self,hand):
         ''' Determines whether a player has enough money to double down '''
 
-        if (self._wallet - (hand._bet)) <= 0:
+        if (self._wallet - hand._bet) <= 0:
             return False
         else:
             return True
@@ -281,6 +342,15 @@ class Player:
         else:
             print(self._hands[index].displayHand())
 
+    def returnHandsHeld(self,index=0,full = False):
+        ''' Returns all or one of the hands the player is currently holding '''
+
+        if full:
+            for hand in self._hands:
+                return hand.displayHand()
+
+        else:
+            return self._hands[index].displayHand()
 
     def reset(self):
         # Do not touch, it is magic and necessary and I don't know why
