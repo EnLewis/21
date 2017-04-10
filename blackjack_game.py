@@ -1,4 +1,5 @@
 from TwentyOne import *
+from decision_dict import *
 
 def checkBet(player, lower_limit):
     """
@@ -65,23 +66,46 @@ def makeChoiceString(player, hand):
 
     return (choice_list, list_converter(choice_list,sep=', ', final_sep=', or '))
 
-def modify_hi_lo(hi_lo_counter, card):
+def modify_hi_lo(deck, card):
     if card.rank() in '23456':
-        hi_lo_counter += 1
+        deck.modHighLowCounter(1)
     elif card.rank() in 'TJQKA':
-        hi_lo_counter -= 1
-    return hi_lo_counter
+        deck.modHighLowCounter(-1)
 
-def makeAiChoice(hand, dealer_upcard):
-    # TODO: CHOOSE AI IMPLEMENTATION
-    return 'Hit'
+def makeAiChoice(hand, dealer_upcard, player):
+    '''
+        Computer player makes a choice depending on the hand values,
+        and the dealer upcard.
+        Makes choice from imported dictionary
+        Args:
+            hand: hand class, player's hand
+            dealer_upcard: int value of card, ace is 1
+            player: player class, computer player who is making choice
+    '''
+    should_split = False
+    hand_values = hand.handValue(for_ai=True)
+    # print("dealer upcard is {}".format(dealer_upcard))
+    if hand.canSplit(player):
+        should_split = (hand_values[0], dealer_upcard) in split_decision
+    if should_split:
+        return 'Split'
+    if len(hand_values) == 2:
+        if not hand_values[0] == hand_values[1]:
+            return soft_decision[(hand_values[1], dealer_upcard)]
+
+    return hard_decision[(hand_values[0], dealer_upcard)]
 
 
-
+#####################################
 # NOTE:program start
 
 print("Welcome to Blackjack!")
+print("For more user friendly displaying of information")
+print("the game will pause after certain messages.")
+input("Please press enter to continue the game at those points.")
 
+#####################################
+# decide number of players
 num_players = input("How many players are with us today?\n")
 # check for proper input
 while(not num_players.isdigit()):
@@ -101,9 +125,10 @@ while(True):
     else:
         # exit input check loop if number is integer and within number of players limit
         break
+#####################################
 
 players = list()
-
+#####################################
 # initialize player names and wallets
 for i in range(num_players - num_AI):
     name = input("Player{}'s name?\n".format(i+1))
@@ -131,28 +156,22 @@ for i in range(num_AI):
     while(not betting_unit.isdigit()):
         betting_unit = input("Please enter a valid amount of money per unit.\n")
     # create a player in the player list with AI set to true
-
+    betting_unit = int(betting_unit)
     players.append(Player(name, wallet, True, betting_unit))
-
+#####################################
 # initialize decks, define lower table limit
-deck = Deck(2)
+num_decks = 6
+deck = Deck(num_decks)
 deck.shuffle()
 lower_limit = 5
-
-# card counters
-#
-# high low counter demonstrates the player advantage.
-# Positive counter means the player has the advantage.
-# Negative counter means the dealer has the advantage.
-# increase by 1 for every low card (2,3,4,5,6)
-# decrease by 1 for every high card (10,J,Q,K,A)
-# else do nothing
-# high low AI will use this for determining bet
-hi_lo_counter = 0
-
+#####################################
+# game loop from now onprint
 print("Preperations are completed, Blackjack will now commence.")
 
 while(players):
+    # shuffle deck if need to shuffle
+    deck.needShuffle()
+
     # keep track of players who can't play
     poor_players = []
     # create dealer as extra player
@@ -160,14 +179,17 @@ while(players):
     #####################################
     # step 1 of a round: get player bets/hands and dealer hand
     # also remove any player unable to play
+    #
+    # NOTE:uncomment next line to get card count before bets are placed
+    # print("Card count is currently {}".format(deck.highLowCounter()))
     for i,player in enumerate(players):
         if player.wallet() < lower_limit:
             print("We must ask {} to leave the table, as he cannot afford the lower limit bet".format(player.name()))
             poor_players.append(i)
             continue
-
+        player.updatePrevWallet()
         if player._ai:
-            betting_units = deck.trueCountHiLo(hi_lo_counter)
+            betting_units = deck.trueCountHiLo()
             if betting_units == 0:
                 bet = lower_limit
             else:
@@ -175,6 +197,8 @@ while(players):
 
             if bet > player.wallet():
                 bet = player.wallet()
+            if bet < lower_limit:
+                bet = lower_limit
             input("Player {} has bet {}.".format(player.name(), bet))
         else:
             # check user input with checkBet and obtain a valid bet
@@ -215,14 +239,14 @@ while(players):
 
         # manage the card counter for high low counting
         for card in curr_hand.cards():
-            hi_lo_counter = modify_hi_lo(hi_lo_counter,card)
+            modify_hi_lo(deck,card)
 
         curr_hand = list_converter(curr_hand.displayHand(), sep=', ')
         print("{} has a hand of {}".format(player.name(), curr_hand))
-    dealer_upcard = dealer.returnHandsHeld()[0])
-    input("The dealer currently holds a {}".format(dealer_upcard))
-    # store dealer upcard value for ai implementation
-    dealer_upcard = dealer.hands()[0].cards[0].value()
+    # store dealer upcard for display and ai decision
+    dealer_upcard = dealer.dealerUpcard()
+    input("The dealer currently holds a {}".format(dealer_upcard.display()))
+    modify_hi_lo(deck, dealer_upcard)
 
     ###################################
     # step 3: handle each players' turns
@@ -243,13 +267,13 @@ while(players):
                     while (not choice in choice_list):
                         choice = input('{}?\n'.format(choice_string))
                 else:
-                    choice = makeAiChoice(hand,dealer_upcard)
-
+                    choice = makeAiChoice(hand,dealer_upcard.value(),player)
+                    print("{} has decided to {}".format(player.name(),choice))
                 # we have a valid choice now
                 if choice == 'Hit' or choice == 'Double Down':
                     card = player.play(choice_to_num[choice],deck,hand)
                     # toggle hi_lo_counter
-                    hi_lo_counter = modify_hi_lo(hi_lo_counter,card)
+                    modify_hi_lo(deck,card)
 
                     if choice == 'Double Down':
                         break
@@ -261,7 +285,7 @@ while(players):
                     cards = player.play(choice_to_num[choice],deck,hand)
 
                     for card in cards:
-                        hi_lo_counter = modify_hi_lo(hi_lo_counter,card)
+                        modify_hi_lo(deck,card)
 
                 elif choice == 'Surrender':
                     player.play(choice_to_num[choice],deck,hand)
@@ -269,17 +293,22 @@ while(players):
 
             if choice == 'Surrender':
                 print("Surrendered, half of bet is returned wallet is now {}.".format(player.wallet()))
-
-            elif hand.isBust():
+            if not choice == 'Stay':
+                str_hand = list_converter(hand.displayHand(), sep=', ')
+                print("\n{}, your current hand is:\n{}".format(player.name(), str_hand))
+            if hand.isBust():
                 print("Bust! {} lost {}$.".format(player.name(), hand.bet()))
-
+    # just make some whitespace for readability
+    print("")
     ###################################
     # step 4: play dealer's turn and compare hand values with dealer
     #         dealer stays on 17 or higher.
     while(True):
         dealer_hand = dealer.hands()[0]
         str_hand = list_converter(dealer_hand.displayHand(), sep=', ')
-        input("The dealer's hand is:\n{}".format(str_hand))
+        input("The dealer's hand is:\n{}\n".format(str_hand))
+        # second card is now visible, counter must count it
+        modify_hi_lo(deck, dealer_hand.cards()[1])
         dealer_hand_value = dealer_hand.handValue()
 
         # dealer busted payout to all players who didn't bust
@@ -289,9 +318,9 @@ while(players):
                 for hand in player.hands():
                     if not hand.isBust():
                         if hand.handValue() == 21 and len(hand.cards()) == 2:
-                            player.addWallet(1.5*hand.bet())
+                            player.addWallet(int(1.5*hand.bet()))
                         player.addWallet(2*hand.bet())
-                print("{} now has {}$".format(player.name(),player.wallet()))
+                print("{} had {}$ now has {}$".format(player.name(),player.prevWallet(),player.wallet()))
             break
 
         # dealer is at 17 or higher, compare with players
@@ -309,7 +338,8 @@ while(players):
                                 player.addWallet(1.5*hand.bet())
                             else:
                                 player.addWallet(hand.bet())
-                print("{} now has {}$".format(player.name(),player.wallet()))
+                print("{} had {}$ now has {}$".format(player.name(),player.prevWallet(),player.wallet()))
+            print("")
             break
         elif dealer_hand_value < 17:
             dealer.play(1, deck, dealer_hand)
@@ -318,3 +348,4 @@ while(players):
     # last step: reset all hands
     for player in players:
         player.reset()
+input("All players are out of money, Game Over")

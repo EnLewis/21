@@ -1,4 +1,3 @@
-#TODO: -Ai stuff
 
 import itertools
 import random
@@ -25,7 +24,6 @@ class Card:
 
     def value(self):
         ''' Return the integer value of the card '''
-        #TODO doesn't properly handle aces yet
 
         value = 0
         rank = ord(self._rank)
@@ -33,7 +31,7 @@ class Card:
         if rank == 65: # Ace
             value = 1
 
-        elif rank in range(50,57): # Non face card or ten
+        elif rank in range(50,58): # Non face card or ten
             value = int(chr(rank))
 
         else: # All remaining cards are worth 10
@@ -99,16 +97,16 @@ class Hand:
             else:
                 for i in range(len(values)):
                     values[i] += new_value
-        if for_ai:
-            return values
-        else:
-            values_to_keep = []
-            for v in values:
-                if v <= 21:
-                    values_to_keep.append(v)
+        values_to_keep = []
+        for v in values:
+            if v <= 21:
+                values_to_keep.append(v)
 
-            if not values_to_keep:
-                return None
+        if not values_to_keep:
+            return None
+        if for_ai:
+            return values_to_keep
+        else:
             return max(values_to_keep)
 
     def cards(self):
@@ -163,13 +161,34 @@ class Deck:
         while(num_decks):
             self._deck += [Card(j,i) for i in self.suit for j in self.rank]
             num_decks -= 1
+        # high low counter demonstrates the player advantage.
+        # Positive counter means the player has the advantage.
+        # Negative counter means the dealer has the advantage.
+        # increase by 1 for every low card (2,3,4,5,6)
+        # decrease by 1 for every high card (10,J,Q,K,A)
+        # else do nothing
+        # high low AI will use this for determining bet amount
+        self._hi_lo_counter = 0
 
-    def trueCountHiLo(self,count):
+    def highLowCounter(self):
+        return self._hi_lo_counter
+
+    def modHighLowCounter(self, mod):
+        ''' add mod to the hi_lo_counter '''
+        self._hi_lo_counter += mod
+
+    def needShuffle(self):
+        ''' returns true if less than 25% of deck left '''
+        if self.cardsLeft() < int(52*self._numDecks*0.25):
+            self.__init__(self._numDecks)
+            self.shuffle()
+
+    def trueCountHiLo(self):
         '''
             Outputs the number of betting units based off count
             according
         '''
-        true_count = count//(self.cardsLeft()/54)
+        true_count = int(self._hi_lo_counter//(self.cardsLeft()/52))
         return max(0, true_count-1)
 
     def shuffle(self):
@@ -184,14 +203,18 @@ class Deck:
 
         for i in range(num_todraw):
             #Draw off the top of the deck
-            result.append( self._deck.pop(0) )
+            result.append( self.draw() )
 
         return result
 
     def draw(self):
         ''' Draw one card from the top of the deck'''
-
+        if self.cardsLeft() == 0:
+            self.__init__(self._numDecks)
+            self.shuffle()
+        # print(self._hi_lo_counter)
         return self._deck.pop(0)
+
 
     def isEmpty(self):
         ''' Checks if the deck is empty '''
@@ -223,6 +246,7 @@ class Player:
     def __init__(self,name,wallet,ai=False, betting_unit=10):
         self._name = name
         self._wallet = wallet
+        self._prev_wallet = wallet
         self._hands = list()
         self._ai = ai
         self._betting_unit = betting_unit
@@ -233,11 +257,17 @@ class Player:
     def wallet(self):
         return self._wallet
 
+    def prevWallet(self):
+        return self._prev_wallet
+
     def name(self):
         return self._name
 
     def isAi(self):
         return self._ai
+
+    def bettingUnit(self):
+        return self._betting_unit
 
     def addHand(self,hand):
         self._hands.append(hand)
@@ -250,6 +280,16 @@ class Player:
     def addWallet(self, gain):
         self._wallet += gain
 
+    def updatePrevWallet(self):
+        self._prev_wallet = self._wallet
+
+    def dealerUpcard(self):
+        '''
+            Returns the first card of the first hand,
+            used for displaying the upcard of the dealer
+        '''
+        return self.hands()[0].cards()[0]
+
     def play(self,choice,deck,hand):
         ''' Exectute the players choice for this hand
 
@@ -260,12 +300,11 @@ class Player:
         '''
         # Hit
         if choice == 1:
-            if deck.cardsLeft() >= 1:
-                card = deck.draw()
-                hand.add(card)
-                value = hand.handValue()
-                if value is None:
-                    hand.setBust(True)
+            card = deck.draw()
+            hand.add(card)
+            value = hand.handValue()
+            if value is None:
+                hand.setBust(True)
             # for counting purposes need return card
             return card
 
